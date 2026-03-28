@@ -193,8 +193,8 @@ def run_pipeline():
     emailer.send(
         subject=f"📚 Research Paper Digest — {week_label}",
         html_body=email_html,
-        attachment_html=browser_html,
-        attachment_name=f"paper_digest_{today.isoformat()}.html",
+
+
     )
 
     logger.info("=== Pipeline complete ===")
