@@ -57,12 +57,12 @@ class PaperSummarizer:
 
         response = self.client.messages.create(
             model=self.model,
-            max_tokens=6000,
+            max_tokens=16000,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
         )
 
-        raw_text = response.content[0].text
+        raw_text = "".join(b.text for b in response.content if b.type == "text")
 
         try:
             cleaned = raw_text.strip()
