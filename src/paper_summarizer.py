@@ -44,7 +44,7 @@ class PaperSummarizer:
 
     def __init__(self):
         self.client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
-        self.model = "claude-sonnet-4-20250514"
+        self.model = "claude-sonnet-5"
 
     def summarize_batch(self, papers: list) -> list[dict]:
         """Summarize a batch of papers in a single API call for efficiency."""
