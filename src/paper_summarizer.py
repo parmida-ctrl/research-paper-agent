@@ -1,6 +1,6 @@
 """
-Paper summarizer — uses Claude to generate structured summaries
-of academic working papers.
+Paper summarizer: uses Claude to generate structured summaries
+of academic working papers, a few papers at a time.
 """
 
 import os
@@ -31,89 +31,104 @@ For each paper, produce a JSON object with this exact structure:
 }
 
 Guidelines:
-- Write summaries as if briefing a portfolio manager — clear, precise, no jargon for jargon's sake
+- Write summaries as if briefing a portfolio manager: clear, precise, no jargon for jargon's sake
 - Highlight empirical findings and magnitudes where available
 - Connect findings to current market debates when possible
 - If the abstract is thin, do your best with available information
 - Be honest about limitations or narrow scope
+- Return ONLY the JSON, with no text before or after it
 """
 
 
 class PaperSummarizer:
-    """Summarizes papers via Claude API."""
+    """Summarizes papers via Claude API in small batches."""
 
-    def __init__(self):
+    def __init__(self, batch_size=4):
         self.client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
         self.model = "claude-sonnet-5"
+        self.batch_size = batch_size
 
     def summarize_batch(self, papers: list) -> list[dict]:
-        """Summarize a batch of papers in a single API call for efficiency."""
-        if not papers:
-            return []
+        results = []
+        for i in range(0, len(papers), self.batch_size):
+            chunk = papers[i:i + self.batch_size]
+            logger.info(f"Summarizing papers {i + 1} to {i + len(chunk)}...")
+            results.extend(self._summarize_chunk(chunk))
+        return results
 
-        user_prompt = self._build_prompt(papers)
+    def _summarize_chunk(self, papers: list) -> list[dict]:
+        prompt = self._build_prompt(papers)
+        for attempt in (1, 2):
+            try:
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=16000,
+                    system=SYSTEM_PROMPT,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                raw = "".join(b.text for b in response.content if b.type == "text")
+                logger.info(f"  Claude stop reason: {response.stop_reason}")
+                parsed = self._parse(raw)
+                if parsed:
+                    return parsed
+                logger.error(f"  Could not read Claude's answer (attempt {attempt}). Start: {raw[:300]}")
+            except Exception as e:
+                logger.error(f"  Claude call failed (attempt {attempt}): {e}")
+        logger.error("  Using backup summaries for this batch")
+        return self._fallback(papers)
 
-        logger.info(f"Sending {len(papers)} papers to Claude for summarization...")
+    def _parse(self, raw: str):
+        text = raw.strip()
+        for opener, closer in (("{", "}"), ("[", "]")):
+            start = text.find(opener)
+            end = text.rfind(closer)
+            if start == -1 or end <= start:
+                continue
+            try:
+                obj = json.loads(text[start:end + 1])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict) and "papers" in obj:
+                return obj["papers"]
+            if isinstance(obj, list):
+                return obj
+            if isinstance(obj, dict):
+                return [obj]
+        return None
 
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=16000,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-
-        raw_text = "".join(b.text for b in response.content if b.type == "text")
-
-        try:
-            cleaned = raw_text.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[1]
-                cleaned = cleaned.rsplit("```", 1)[0]
-            result = json.loads(cleaned)
-            if isinstance(result, dict) and "papers" in result:
-                return result["papers"]
-            elif isinstance(result, list):
-                return result
-            else:
-                return [result]
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Claude response: {e}")
-            logger.error(f"Raw (first 500): {raw_text[:500]}")
-            # Fallback: return basic info
-            return [
-                {
-                    "title": p.title,
-                    "authors": p.authors,
-                    "source": p.source,
-                    "url": p.url,
-                    "category": "Other",
-                    "category_icon": "📄",
-                    "summary": p.abstract[:500] if p.abstract else "Summary unavailable.",
-                    "key_finding": "See full paper for details.",
-                    "market_relevance": "",
-                    "difficulty": "Intermediate",
-                }
-                for p in papers
-            ]
+    def _fallback(self, papers: list) -> list[dict]:
+        return [
+            {
+                "title": p.title,
+                "authors": p.authors,
+                "source": p.source,
+                "url": p.url,
+                "category": "Other",
+                "category_icon": "📄",
+                "summary": p.abstract[:500] if p.abstract else "Summary unavailable.",
+                "key_finding": "See full paper for details.",
+                "market_relevance": "",
+                "difficulty": "Intermediate",
+            }
+            for p in papers
+        ]
 
     def _build_prompt(self, papers: list) -> str:
         parts = [
             f"Please summarize the following {len(papers)} working papers.",
-            "Return a JSON array of summary objects, one per paper.",
-            "Wrap the array in a JSON object: {\"papers\": [...]}",
+            "Return a JSON object in this form: {\"papers\": [ ...one summary object per paper... ]}",
             "",
         ]
         for i, p in enumerate(papers):
-            parts.append(f"{'='*60}")
-            parts.append(f"PAPER {i+1}")
-            parts.append(f"{'='*60}")
+            parts.append("=" * 60)
+            parts.append(f"PAPER {i + 1}")
+            parts.append("=" * 60)
             parts.append(f"Title: {p.title}")
             parts.append(f"Authors: {p.authors}")
             parts.append(f"Source: {p.source}")
             parts.append(f"URL: {p.url}")
             parts.append(f"Published: {p.published}")
-            parts.append(f"Abstract/Text:")
+            parts.append("Abstract/Text:")
             parts.append(p.abstract[:2000] if p.abstract else "(No abstract available)")
             parts.append("")
-
         return "\n".join(parts)
