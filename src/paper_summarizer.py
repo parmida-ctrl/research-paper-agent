@@ -37,6 +37,7 @@ Guidelines:
 - If the abstract is thin, do your best with available information
 - Be honest about limitations or narrow scope
 - Return ONLY the JSON, with no text before or after it
+- Inside text values, use single quotes instead of double quotes
 """
 
 
@@ -84,9 +85,16 @@ class PaperSummarizer:
             end = text.rfind(closer)
             if start == -1 or end <= start:
                 continue
+            snippet = text[start:end + 1]
             try:
-                obj = json.loads(text[start:end + 1])
+                obj = json.loads(snippet, strict=False)
             except json.JSONDecodeError:
+                try:
+                    import json_repair
+                    obj = json_repair.loads(snippet)
+                except Exception:
+                    continue
+            if not obj:
                 continue
             if isinstance(obj, dict) and "papers" in obj:
                 return obj["papers"]
