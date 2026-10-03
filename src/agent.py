@@ -215,7 +215,27 @@ def run_pipeline():
     logger.info("Phase 4: Building digest...")
 
     builder = DigestBuilder()
+    # "Also worth a look": 5-10 blog posts, speeches and commentary, links only
+    from paper_sources import collect_other
+    other = []
+    try:
+        chosen_titles = {"".join(c for c in p.title.lower() if c.isalnum())[:70] for p in top_papers}
+        candidates = [o for o in ranker.rank(collect_other(lookback_days=7))
+                      if o.relevance_score > 0
+                      and "".join(c for c in o.title.lower() if c.isalnum())[:70] not in chosen_titles]
+        per = {}
+        for o in candidates:
+            if len(other) >= 8:
+                break
+            if per.get(o.source, 0) < 2:
+                other.append(o)
+                per[o.source] = per.get(o.source, 0) + 1
+        print("::notice title=Also worth a look::" + ", ".join(f"{k} {v}" for k, v in sorted(per.items())))
+    except Exception as e:
+        logger.warning(f"Could not build the 'Also worth a look' list: {e}")
+
     email_html = builder.build_email(
+        other=other,
         summaries=summaries,
         report_date=report_date,
         week_label=week_label,
@@ -223,6 +243,7 @@ def run_pipeline():
         total_selected=len(top_papers),
     )
     browser_html = builder.build_browser(
+        other=other,
         summaries=summaries,
         report_date=report_date,
         week_label=week_label,

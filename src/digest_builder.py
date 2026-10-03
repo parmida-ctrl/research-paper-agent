@@ -35,8 +35,24 @@ CATEGORY_COLORS = {
 class DigestBuilder:
     """Builds email and browser versions of the research digest."""
 
-    def build_email(self, summaries, report_date, week_label, total_collected, total_selected):
-        papers_html = self._build_email_papers(summaries)
+    def _other_html(self, other, dark=False):
+        if not other:
+            return ""
+        import html as _h
+        link = "#c4b5fd" if dark else "#6d28d9"
+        text = "#e2e8f0" if dark else TEXT
+        muted = "#94a3b8" if dark else TEXT_MUTED
+        rows = "".join(
+            f'<li style="margin:0 0 9px;"><a href="{_h.escape(o.url, quote=True)}" style="color:{link};">{_h.escape(o.title)}</a>'
+            f' <span style="color:{muted};font-size:12px;">· {_h.escape(o.source)}</span></li>'
+            for o in other)
+        return (f'<div style="margin-top:8px;padding-top:22px;border-top:2px solid {BORDER};font-family:{FONT};">'
+                f'<div style="font-size:18px;font-weight:700;color:{text};margin-bottom:4px;">Also worth a look</div>'
+                f'<div style="font-size:12px;color:{muted};margin-bottom:12px;">Blog posts, speeches and commentary from this week. Links only.</div>'
+                f'<ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6;color:{text};">{rows}</ul></div>')
+
+    def build_email(self, summaries, report_date, week_label, total_collected, total_selected, other=None):
+        papers_html = self._build_email_papers(summaries) + self._other_html(other)
         return self._wrap_email(
             papers_html=papers_html,
             report_date=report_date,
@@ -45,8 +61,8 @@ class DigestBuilder:
             total_selected=total_selected,
         )
 
-    def build_browser(self, summaries, report_date, week_label, total_collected, total_selected):
-        papers_html = self._build_browser_papers(summaries)
+    def build_browser(self, summaries, report_date, week_label, total_collected, total_selected, other=None):
+        papers_html = self._build_browser_papers(summaries) + self._other_html(other, dark=True)
         return self._wrap_browser(
             papers_html=papers_html,
             report_date=report_date,

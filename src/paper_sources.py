@@ -331,8 +331,6 @@ EXTRA_SOURCES = {
     "Brookings": [
         "https://www.brookings.edu/feed/?post_type=article",
     ],
-    "Hoover Institution": ["https://www.hoover.org/rss.xml"],
-    "Tax Foundation": ["https://taxfoundation.org/feed/"],
     "Roosevelt Institute": ["https://rooseveltinstitute.org/feed/"],
     "Equitable Growth": ["https://equitablegrowth.org/feed/"],
 
@@ -433,6 +431,7 @@ class OpenAlexCollector(BaseCollector):
 
 
 FEED_REPORT: list = []
+OTHER_ITEMS: list = []   # speeches, blog posts, opinion pieces (links only)
 
 
 class FeedCollector(BaseCollector):
@@ -458,6 +457,12 @@ class FeedCollector(BaseCollector):
                 if not item["url"] or item["url"] in seen or not item["published"]:
                     continue
                 if NOT_A_PAPER.search(item["title"]):
+                    # Not a paper: keep it for the short "Also worth a look" list
+                    seen.add(item["url"])
+                    OTHER_ITEMS.append(Paper(
+                        title=" ".join(item["title"].split()), authors=item["authors"],
+                        source=self.source_name, url=item["url"], published=item["published"],
+                        abstract=(item["summary"] or "")[:600]))
                     continue
                 seen.add(item["url"])
                 papers.append(Paper(
@@ -473,3 +478,41 @@ class FeedCollector(BaseCollector):
 
 def extra_collectors(lookback_days=7):
     return [FeedCollector(name, urls, lookback_days) for name, urls in EXTRA_SOURCES.items()] + [OpenAlexCollector()]
+
+
+# ---------------------------------------------------------------------------
+#  "Also worth a look": blogs, speeches and commentary (shown as links only)
+# ---------------------------------------------------------------------------
+OTHER_FEEDS = {
+    "IMF Blog": ["https://www.imf.org/en/Blogs/rss"],
+    "St. Louis Fed (FRED Blog)": ["https://fredblog.stlouisfed.org/feed/"],
+    "Bank Underground (Bank of England)": ["https://bankunderground.co.uk/feed/"],
+    "OECD Ecoscope": ["https://oecdecoscope.blog/feed/"],
+    "World Bank Blogs": ["https://blogs.worldbank.org/en/rss.xml"],
+    "ECB": ["https://www.ecb.europa.eu/rss/press.html"],
+    "Federal Reserve speeches": ["https://www.federalreserve.gov/feeds/speeches.xml"],
+    "BIS speeches": ["https://www.bis.org/doclist/cbspeeches.rss"],
+    "Cato Institute": ["https://www.cato.org/rss/recent-opeds"],
+    "Tax Foundation": ["https://taxfoundation.org/feed/"],
+    "Hoover Institution": ["https://www.hoover.org/rss.xml"],
+    "Marginal Revolution": ["https://marginalrevolution.com/feed"],
+}
+
+
+def collect_other(lookback_days=7) -> list[Paper]:
+    """Blog posts, speeches and commentary from the last week."""
+    base = BaseCollector(lookback_days)
+    items, seen = list(OTHER_ITEMS), {p.url for p in OTHER_ITEMS}
+    for name, urls in OTHER_FEEDS.items():
+        for url in urls:
+            try:
+                entries = base._parse_rss(url, max_items=25)
+            except Exception:
+                entries = []
+            for e in entries:
+                if not e["url"] or e["url"] in seen or not e["published"]:
+                    continue
+                seen.add(e["url"])
+                items.append(Paper(title=" ".join(e["title"].split()), authors=e["authors"], source=name,
+                                   url=e["url"], published=e["published"], abstract=(e["summary"] or "")[:600]))
+    return items
