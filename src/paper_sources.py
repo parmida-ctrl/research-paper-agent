@@ -316,25 +316,13 @@ class SSRNCollector(BaseCollector):
 # ---------------------------------------------------------------------------
 EXTRA_SOURCES = {
     # ---- Central banks & international institutions (working papers) ----
-    "IMF": [
-        "https://www.imf.org/en/Publications/RSS?language=eng&series=IMF%20Working%20Papers",
-        "https://www.imf.org/en/Publications/RSS?language=eng&series=Staff%20Discussion%20Notes",
-    ],
     "BIS": [
-        "https://www.bis.org/doclist/wppubls.rss",
         "https://www.bis.org/doclist/bis_fsi_publs.rss",
     ],
     "Bank of England": ["https://www.bankofengland.co.uk/rss/publications"],
     "Bank of Canada": [
         "https://www.bankofcanada.ca/content_type/working-papers/feed/",
-        "https://www.bankofcanada.ca/content_type/staff-analytical-notes/feed/",
-        "https://www.bankofcanada.ca/content_type/discussion-papers/feed/",
     ],
-    "Reserve Bank of Australia": ["https://www.rba.gov.au/rss/rss-cb-rdp.xml"],
-    "World Bank": [
-        "https://openknowledge.worldbank.org/server/opensearch/search?format=rss&scope=9&sort=dc.date.issued&sort_direction=desc&query=*",
-    ],
-    "OECD": ["https://www.oecd.org/en/publications/rss.xml"],
     "CBO": ["https://www.cbo.gov/publications/all/rss.xml"],
 
     # ---- Think tanks ----
@@ -342,30 +330,15 @@ EXTRA_SOURCES = {
     "Peterson Institute": ["https://www.piie.com/rss/update.xml"],
     "Brookings": [
         "https://www.brookings.edu/feed/?post_type=article",
-        "https://www.brookings.edu/feed/",
-        "https://www.brookings.edu/programs/economic-studies/feed/",
-        "https://www.brookings.edu/topic/economy/feed/",
     ],
-    "Bruegel": ["https://www.bruegel.org/rss.xml"],
-    "Economic Policy Institute": ["https://www.epi.org/feed/"],
-    "American Enterprise Institute": ["https://www.aei.org/policy-areas/economics/feed/"],
     "Hoover Institution": ["https://www.hoover.org/rss.xml"],
-    "Cato Institute": ["https://www.cato.org/rss/recent-opeds", "https://www.cato.org/rss/working-paper"],
-    "Becker Friedman Institute": ["https://bfi.uchicago.edu/feed/"],
     "Tax Foundation": ["https://taxfoundation.org/feed/"],
-    "Urban Institute": ["https://www.urban.org/rss.xml"],
-    "Mercatus Center": ["https://www.mercatus.org/rss.xml"],
-    "Council on Foreign Relations": ["https://www.cfr.org/rss.xml"],
     "Roosevelt Institute": ["https://rooseveltinstitute.org/feed/"],
-    "Kiel Institute": ["https://www.ifw-kiel.de/rss.xml"],
     "Equitable Growth": ["https://equitablegrowth.org/feed/"],
 
     # ---- New working papers across many institutions (RePEc weekly reports) ----
     "RePEc: Monetary Economics": ["http://nep.repec.org/rss/nep-mon.rss.xml"],
-    "RePEc: Macroeconomics": ["http://nep.repec.org/rss/nep-mac.rss.xml"],
-    "RePEc: Financial Markets": ["http://nep.repec.org/rss/nep-fmk.rss.xml"],
     "RePEc: Central Banking": ["http://nep.repec.org/rss/nep-cba.rss.xml"],
-    "RePEc: Banking": ["http://nep.repec.org/rss/nep-ban.rss.xml"],
 
     # ---- Preprints ----
     "arXiv (economics & finance)": [
