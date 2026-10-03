@@ -158,7 +158,13 @@ def run_pipeline():
     # Diversify: at most a couple of papers per institution, so no single
     # source (ECB, NBER...) dominates. All Fed banks count as one institution.
     def family(p):
-        return "Federal Reserve" if "Federal Reserve" in p.source else p.source
+        if "Federal Reserve" in p.source:
+            return "Federal Reserve"
+        if p.source.startswith("RePEc"):
+            return "RePEc"
+        return p.source
+
+    MAX_JOURNAL_PAPERS = 5  # journals share a combined limit so they don't crowd out the rest
 
     limit = INTEREST_PROFILE["max_papers"]
     per_source = INTEREST_PROFILE["max_per_source"]
@@ -168,6 +174,9 @@ def run_pipeline():
             if len(top_papers) >= limit:
                 break
             if p in top_papers or p.relevance_score <= 0:
+                continue
+            is_journal = p.source.endswith("(journal)")
+            if is_journal and sum(1 for q in top_papers if q.source.endswith("(journal)")) >= MAX_JOURNAL_PAPERS:
                 continue
             if counts.get(family(p), 0) < per_source:
                 top_papers.append(p)
@@ -182,6 +191,13 @@ def run_pipeline():
     print("::notice title=Papers selected per source::" + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
 
     logger.info(f"  Selected top {len(top_papers)} papers")
+
+    if os.environ.get("DRY_RUN") == "true":
+        from paper_sources import FEED_REPORT
+        for i in range(0, len(FEED_REPORT), 12):
+            print("::notice title=Feed check::" + " | ".join(FEED_REPORT[i:i + 12]))
+        print("::notice title=Selected titles::" + " | ".join(f"[{p.source}] {p.title[:60]}" for p in top_papers))
+        return
 
     # ------------------------------------------------------------------
     # 3  SUMMARIZE via Claude

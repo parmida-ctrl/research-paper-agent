@@ -4,11 +4,17 @@ on:
   schedule:
     - cron: '30 11 * * 6'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Check sources only (no email)"
+        type: boolean
+        default: false
 
 env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
   REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO }}
+  DRY_RUN: ${{ inputs.dry_run }}
 
 jobs:
   generate-digest:

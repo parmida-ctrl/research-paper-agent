@@ -1,3 +1,4 @@
+import re
 """
 Paper source collectors for the Research Paper Summarizer.
 Each collector pulls recent working papers from a specific institution.
@@ -163,7 +164,6 @@ class IMFCollector(BaseCollector):
         papers = []
         feeds = [
             "https://www.imf.org/en/Publications/RSS?type=WP",
-            "https://www.imf.org/en/Blogs/rss",
         ]
         for feed_url in feeds:
             items = self._parse_rss(feed_url, max_items=15)
@@ -201,7 +201,6 @@ class FedCollector(BaseCollector):
             "FEDS Notes":       "https://www.federalreserve.gov/feeds/feds_notes.xml",
             "NY Fed":           "https://libertystreeteconomics.newyorkfed.org/feed/",
             "SF Fed":           "https://www.frbsf.org/research-and-insights/publications/economic-letter/feed/",
-            "St. Louis Fed":    "https://fredblog.stlouisfed.org/feed/",
             "Atlanta Fed":      "https://www.atlantafed.org/rss/macroblog",
             "Chicago Fed":      "https://www.chicagofed.org/rss/publications",
             "Dallas Fed":       "https://www.dallasfed.org/rss/ecod.aspx",
@@ -306,44 +305,147 @@ class SSRNCollector(BaseCollector):
 #  Additional research sources (one generic collector per institution)
 # ---------------------------------------------------------------------------
 EXTRA_SOURCES = {
+    # ---- Central banks & international institutions (working papers) ----
     "IMF": [
         "https://www.imf.org/en/Publications/RSS?language=eng&series=IMF%20Working%20Papers",
+        "https://www.imf.org/en/Publications/RSS?language=eng&series=Staff%20Discussion%20Notes",
     ],
     "BIS": [
         "https://www.bis.org/doclist/wppubls.rss",
         "https://www.bis.org/doclist/bis_fsi_publs.rss",
     ],
-    "Bank of England": [
-        "https://www.bankofengland.co.uk/rss/publications",
-        "https://bankunderground.co.uk/feed/",
-    ],
+    "Bank of England": ["https://www.bankofengland.co.uk/rss/publications"],
     "Bank of Canada": [
         "https://www.bankofcanada.ca/content_type/working-papers/feed/",
         "https://www.bankofcanada.ca/content_type/staff-analytical-notes/feed/",
+        "https://www.bankofcanada.ca/content_type/discussion-papers/feed/",
     ],
-    "Reserve Bank of Australia": [
-        "https://www.rba.gov.au/rss/rss-cb-rdp.xml",
+    "Reserve Bank of Australia": ["https://www.rba.gov.au/rss/rss-cb-rdp.xml"],
+    "World Bank": [
+        "https://openknowledge.worldbank.org/server/opensearch/search?format=rss&scope=9&sort=dc.date.issued&sort_direction=desc&query=*",
     ],
-    "CEPR VoxEU": [
-        "https://cepr.org/rss/vox-content",
-    ],
-    "Peterson Institute": [
-        "https://www.piie.com/rss/update.xml",
-    ],
+    "OECD": ["https://www.oecd.org/en/publications/rss.xml"],
+    "CBO": ["https://www.cbo.gov/publications/all/rss.xml"],
+
+    # ---- Think tanks ----
+    "CEPR VoxEU": ["https://cepr.org/rss/vox-content"],
+    "Peterson Institute": ["https://www.piie.com/rss/update.xml"],
     "Brookings": [
+        "https://www.brookings.edu/feed/",
+        "https://www.brookings.edu/programs/economic-studies/feed/",
         "https://www.brookings.edu/topic/economy/feed/",
     ],
+    "Bruegel": ["https://www.bruegel.org/rss.xml"],
+    "Economic Policy Institute": ["https://www.epi.org/feed/"],
+    "American Enterprise Institute": ["https://www.aei.org/policy-areas/economics/feed/"],
+    "Hoover Institution": ["https://www.hoover.org/rss.xml"],
+    "Cato Institute": ["https://www.cato.org/rss/recent-opeds", "https://www.cato.org/rss/working-paper"],
+    "Becker Friedman Institute": ["https://bfi.uchicago.edu/feed/"],
+    "Tax Foundation": ["https://taxfoundation.org/feed/"],
+    "Urban Institute": ["https://www.urban.org/rss.xml"],
+    "Mercatus Center": ["https://www.mercatus.org/rss.xml"],
+    "Council on Foreign Relations": ["https://www.cfr.org/rss.xml"],
+    "Roosevelt Institute": ["https://rooseveltinstitute.org/feed/"],
+    "Kiel Institute": ["https://www.ifw-kiel.de/rss.xml"],
+    "Equitable Growth": ["https://equitablegrowth.org/feed/"],
+
+    # ---- New working papers across many institutions (RePEc weekly reports) ----
+    "RePEc: Monetary Economics": ["http://nep.repec.org/rss/nep-mon.rss.xml"],
+    "RePEc: Macroeconomics": ["http://nep.repec.org/rss/nep-mac.rss.xml"],
+    "RePEc: Financial Markets": ["http://nep.repec.org/rss/nep-fmk.rss.xml"],
+    "RePEc: Central Banking": ["http://nep.repec.org/rss/nep-cba.rss.xml"],
+    "RePEc: Banking": ["http://nep.repec.org/rss/nep-ban.rss.xml"],
+
+    # ---- Preprints ----
     "arXiv (economics & finance)": [
         "http://export.arxiv.org/api/query?search_query=cat:econ.GN+OR+cat:q-fin.GN+OR+cat:q-fin.PM+OR+cat:q-fin.RM"
         "&sortBy=submittedDate&sortOrder=descending&max_results=40",
     ],
-    "World Bank": [
-        "https://blogs.worldbank.org/en/rss.xml",
-    ],
-    "OECD": [
-        "https://oecdecoscope.blog/feed/",
-    ],
 }
+
+# Titles that are clearly not research papers
+NOT_A_PAPER = re.compile(
+    r"\b(press release|speech|remarks|podcast|webinar|event|testimony|interview|video|newsletter|"
+    r"statement|op-ed|opinion|commentary|q&a|agenda|minutes|annual report|job|vacancy)\b", re.I)
+
+# ---------------------------------------------------------------------------
+#  Journals and working-paper series via OpenAlex (a free index of research)
+# ---------------------------------------------------------------------------
+JOURNAL_ISSNS = {
+    "0002-8282": "American Economic Review",
+    "0033-5533": "Quarterly Journal of Economics",
+    "0022-3808": "Journal of Political Economy",
+    "0012-9682": "Econometrica",
+    "0034-6527": "Review of Economic Studies",
+    "0022-1082": "Journal of Finance",
+    "0304-405X": "Journal of Financial Economics",
+    "0893-9454": "Review of Financial Studies",
+    "0304-3932": "Journal of Monetary Economics",
+    "1945-7707": "AEJ: Macroeconomics",
+    "0895-3309": "Journal of Economic Perspectives",
+    "0007-2303": "Brookings Papers on Economic Activity",
+    "2041-4161": "IMF Economic Review",
+    "0022-2879": "Journal of Money, Credit and Banking",
+    "0015-198X": "Financial Analysts Journal",
+    "0095-4918": "Journal of Portfolio Management",
+}
+SERIES_ISSNS = {
+    "1018-5941": "IMF",          # IMF Working Papers
+    "1813-9450": "World Bank",   # Policy Research Working Papers
+}
+
+
+class OpenAlexCollector(BaseCollector):
+    source_name = "Journals & working paper series"
+
+    def __init__(self, lookback_days=14):
+        super().__init__(lookback_days)
+        self.days = lookback_days
+
+    def collect(self) -> list[Paper]:
+        papers = []
+        today = datetime.date.today()
+        start = today - datetime.timedelta(days=self.days)
+        for issns, is_journal in ((JOURNAL_ISSNS, True), (SERIES_ISSNS, False)):
+            url = "https://api.openalex.org/works"
+            params = {
+                "filter": f"primary_location.source.issn:{'|'.join(issns)},"
+                          f"from_publication_date:{start},to_publication_date:{today}",
+                "sort": "publication_date:desc",
+                "per-page": 100,
+            }
+            try:
+                r = requests.get(url, params=params, timeout=30, headers={"User-Agent": "research-paper-digest"})
+                r.raise_for_status()
+                results = r.json().get("results", [])
+            except Exception as e:
+                logger.warning(f"OpenAlex failed: {e}")
+                continue
+            for w in results:
+                title = (w.get("title") or "").strip()
+                if not title or w.get("type") not in ("article", "preprint", "report", "review"):
+                    continue
+                src = ((w.get("primary_location") or {}).get("source") or {})
+                name = None
+                for i in src.get("issn") or []:
+                    name = name or issns.get(i)
+                name = name or src.get("display_name") or "Journal"
+                inv = w.get("abstract_inverted_index") or {}
+                words = sorted((pos, word) for word, poss in inv.items() for pos in poss)
+                abstract = " ".join(word for _, word in words)
+                authors = ", ".join(a["author"]["display_name"] for a in (w.get("authorships") or [])[:6] if a.get("author"))
+                papers.append(Paper(
+                    title=title,
+                    authors=authors,
+                    source=f"{name} (journal)" if is_journal else name,
+                    url=w.get("doi") or (w.get("primary_location") or {}).get("landing_page_url") or w.get("id", ""),
+                    published=w.get("publication_date", ""),
+                    abstract=abstract[:2000],
+                ))
+        return papers
+
+
+FEED_REPORT: list = []
 
 
 class FeedCollector(BaseCollector):
@@ -361,9 +463,14 @@ class FeedCollector(BaseCollector):
                 items = self._parse_rss(url, max_items=40)
             except Exception as e:
                 logger.warning(f"{self.source_name} feed failed: {e}")
+                items = []
+            FEED_REPORT.append(f"{len(items)} {url[:70]}")
+            if not items:
                 continue
             for item in items:
                 if not item["url"] or item["url"] in seen or not item["published"]:
+                    continue
+                if NOT_A_PAPER.search(item["title"]):
                     continue
                 seen.add(item["url"])
                 papers.append(Paper(
@@ -378,4 +485,4 @@ class FeedCollector(BaseCollector):
 
 
 def extra_collectors(lookback_days=7):
-    return [FeedCollector(name, urls, lookback_days) for name, urls in EXTRA_SOURCES.items()]
+    return [FeedCollector(name, urls, lookback_days) for name, urls in EXTRA_SOURCES.items()] + [OpenAlexCollector()]
