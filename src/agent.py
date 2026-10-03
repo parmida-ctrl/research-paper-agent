@@ -20,6 +20,7 @@ from paper_sources import (
     FedCollector,
     ECBCollector,
     SSRNCollector,
+    extra_collectors,
 )
 from paper_ranker import PaperRanker
 from paper_summarizer import PaperSummarizer
@@ -97,7 +98,8 @@ INTEREST_PROFILE = {
         "volatility",
         "risk premia",
     ],
-    "max_papers": 12,
+    "max_papers": 15,
+    "max_per_source": 2,
 }
 
 
@@ -120,7 +122,7 @@ def run_pipeline():
         FedCollector(lookback_days=7),
         ECBCollector(lookback_days=7),
         SSRNCollector(lookback_days=7),
-    ]
+    ] + extra_collectors(lookback_days=7)
 
     all_papers = []
     for collector in collectors:
@@ -144,7 +146,40 @@ def run_pipeline():
 
     ranker = PaperRanker(interests=INTEREST_PROFILE)
     ranked_papers = ranker.rank(all_papers)
-    top_papers = ranked_papers[:INTEREST_PROFILE["max_papers"]]
+    # Drop duplicates (the same paper can arrive from two feeds)
+    seen_urls, seen_titles, unique = set(), set(), []
+    for p in ranked_papers:
+        key = "".join(c for c in p.title.lower() if c.isalnum())[:70]
+        if p.url in seen_urls or key in seen_titles:
+            continue
+        seen_urls.add(p.url); seen_titles.add(key)
+        unique.append(p)
+
+    # Diversify: at most a couple of papers per institution, so no single
+    # source (ECB, NBER...) dominates. All Fed banks count as one institution.
+    def family(p):
+        return "Federal Reserve" if "Federal Reserve" in p.source else p.source
+
+    limit = INTEREST_PROFILE["max_papers"]
+    per_source = INTEREST_PROFILE["max_per_source"]
+    top_papers, counts = [], {}
+    while len(top_papers) < limit and per_source <= limit:
+        for p in unique:
+            if len(top_papers) >= limit:
+                break
+            if p in top_papers or p.relevance_score <= 0:
+                continue
+            if counts.get(family(p), 0) < per_source:
+                top_papers.append(p)
+                counts[family(p)] = counts.get(family(p), 0) + 1
+        per_source += 1  # only loosens if there were not enough papers
+    top_papers.sort(key=lambda p: p.relevance_score, reverse=True)
+
+    collected = {}
+    for p in all_papers:
+        collected[family(p)] = collected.get(family(p), 0) + 1
+    print("::notice title=Papers collected per source::" + ", ".join(f"{k} {v}" for k, v in sorted(collected.items())))
+    print("::notice title=Papers selected per source::" + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
 
     logger.info(f"  Selected top {len(top_papers)} papers")
 

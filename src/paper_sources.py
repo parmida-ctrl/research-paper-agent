@@ -196,7 +196,9 @@ class FedCollector(BaseCollector):
     def collect(self) -> list[Paper]:
         papers = []
         feeds = {
-            "Fed Board":        "https://www.federalreserve.gov/feeds/feds_workingpapers.xml",
+            "Fed Board":        "https://www.federalreserve.gov/feeds/feds.xml",
+            "Fed Board IFDP":   "https://www.federalreserve.gov/feeds/ifdp.xml",
+            "FEDS Notes":       "https://www.federalreserve.gov/feeds/feds_notes.xml",
             "NY Fed":           "https://libertystreeteconomics.newyorkfed.org/feed/",
             "SF Fed":           "https://www.frbsf.org/research-and-insights/publications/economic-letter/feed/",
             "St. Louis Fed":    "https://fredblog.stlouisfed.org/feed/",
@@ -245,7 +247,6 @@ class ECBCollector(BaseCollector):
         papers = []
         feeds = [
             "https://www.ecb.europa.eu/rss/wppub.html",
-            "https://www.ecb.europa.eu/rss/press.html",
         ]
         for feed_url in feeds:
             try:
@@ -299,3 +300,82 @@ class SSRNCollector(BaseCollector):
             except Exception as e:
                 logger.warning(f"SSRN feed failed: {e}")
         return papers
+
+
+# ---------------------------------------------------------------------------
+#  Additional research sources (one generic collector per institution)
+# ---------------------------------------------------------------------------
+EXTRA_SOURCES = {
+    "IMF": [
+        "https://www.imf.org/en/Publications/RSS?language=eng&series=IMF%20Working%20Papers",
+    ],
+    "BIS": [
+        "https://www.bis.org/doclist/wppubls.rss",
+        "https://www.bis.org/doclist/bis_fsi_publs.rss",
+    ],
+    "Bank of England": [
+        "https://www.bankofengland.co.uk/rss/publications",
+        "https://bankunderground.co.uk/feed/",
+    ],
+    "Bank of Canada": [
+        "https://www.bankofcanada.ca/content_type/working-papers/feed/",
+        "https://www.bankofcanada.ca/content_type/staff-analytical-notes/feed/",
+    ],
+    "Reserve Bank of Australia": [
+        "https://www.rba.gov.au/rss/rss-cb-rdp.xml",
+    ],
+    "CEPR VoxEU": [
+        "https://cepr.org/rss/vox-content",
+    ],
+    "Peterson Institute": [
+        "https://www.piie.com/rss/update.xml",
+    ],
+    "Brookings": [
+        "https://www.brookings.edu/topic/economy/feed/",
+    ],
+    "arXiv (economics & finance)": [
+        "http://export.arxiv.org/api/query?search_query=cat:econ.GN+OR+cat:q-fin.GN+OR+cat:q-fin.PM+OR+cat:q-fin.RM"
+        "&sortBy=submittedDate&sortOrder=descending&max_results=40",
+    ],
+    "World Bank": [
+        "https://blogs.worldbank.org/en/rss.xml",
+    ],
+    "OECD": [
+        "https://oecdecoscope.blog/feed/",
+    ],
+}
+
+
+class FeedCollector(BaseCollector):
+    """Generic collector: one institution, one or more feeds."""
+
+    def __init__(self, name, urls, lookback_days=7):
+        super().__init__(lookback_days)
+        self.source_name = name
+        self.urls = urls
+
+    def collect(self) -> list[Paper]:
+        papers, seen = [], set()
+        for url in self.urls:
+            try:
+                items = self._parse_rss(url, max_items=40)
+            except Exception as e:
+                logger.warning(f"{self.source_name} feed failed: {e}")
+                continue
+            for item in items:
+                if not item["url"] or item["url"] in seen or not item["published"]:
+                    continue
+                seen.add(item["url"])
+                papers.append(Paper(
+                    title=" ".join(item["title"].split()),
+                    authors=item["authors"],
+                    source=self.source_name,
+                    url=item["url"],
+                    published=item["published"],
+                    abstract=(item["summary"] or "")[:2000],
+                ))
+        return papers
+
+
+def extra_collectors(lookback_days=7):
+    return [FeedCollector(name, urls, lookback_days) for name, urls in EXTRA_SOURCES.items()]
