@@ -48,7 +48,17 @@ class BaseCollector:
         raise NotImplementedError
 
     def _parse_rss(self, feed_url, max_items=20) -> list[dict]:
-        feed = feedparser.parse(feed_url)
+        # Fetch like a normal browser; several sites return nothing to unknown readers
+        try:
+            resp = requests.get(feed_url, timeout=25, headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+            })
+            feed = feedparser.parse(resp.content)
+            if not feed.entries:
+                feed = feedparser.parse(feed_url)
+        except Exception:
+            feed = feedparser.parse(feed_url)
         items = []
         for entry in feed.entries[:max_items]:
             pub_date = self._parse_date(entry)
@@ -331,6 +341,7 @@ EXTRA_SOURCES = {
     "CEPR VoxEU": ["https://cepr.org/rss/vox-content"],
     "Peterson Institute": ["https://www.piie.com/rss/update.xml"],
     "Brookings": [
+        "https://www.brookings.edu/feed/?post_type=article",
         "https://www.brookings.edu/feed/",
         "https://www.brookings.edu/programs/economic-studies/feed/",
         "https://www.brookings.edu/topic/economy/feed/",
@@ -366,7 +377,8 @@ EXTRA_SOURCES = {
 # Titles that are clearly not research papers
 NOT_A_PAPER = re.compile(
     r"\b(press release|speech|remarks|podcast|webinar|event|testimony|interview|video|newsletter|"
-    r"statement|op-ed|opinion|commentary|q&a|agenda|minutes|annual report|job|vacancy)\b", re.I)
+    r"statement|op-ed|opinion|commentary|q&a|agenda|minutes|annual report|job|vacancy|cost estimate)\b"
+    r"|^(H\.R\.|S\.|H\.J\.|S\.J\.|H\. ?Con\.) ?\d", re.I)
 
 # ---------------------------------------------------------------------------
 #  Journals and working-paper series via OpenAlex (a free index of research)
@@ -407,6 +419,8 @@ class OpenAlexCollector(BaseCollector):
         today = datetime.date.today()
         start = today - datetime.timedelta(days=self.days)
         for issns, is_journal in ((JOURNAL_ISSNS, True), (SERIES_ISSNS, False)):
+            if not is_journal:
+                start = today - datetime.timedelta(days=30)
             url = "https://api.openalex.org/works"
             params = {
                 "filter": f"primary_location.source.issn:{'|'.join(issns)},"
