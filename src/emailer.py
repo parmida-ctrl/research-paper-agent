@@ -25,6 +25,8 @@ class DigestEmailer:
             "to": [self.to_email],
             "subject": subject,
             "html": html_body,
+            # Short plain-text part keeps the email small so Gmail doesn't clip the end
+            "text": "Your weekly Research Paper Digest is ready. Open this email in an app that shows HTML to read it.",
         }
 
         if attachment_html:
